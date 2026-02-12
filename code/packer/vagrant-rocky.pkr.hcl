@@ -4,35 +4,27 @@ packer {
       source  = "github.com/hashicorp/vagrant"
       version = "~> 1"
     }
-    virtualbox = {
-      version = "~> 1"
-      source  = "github.com/hashicorp/virtualbox"
-    }
-    qemu = {
-      version = "~> 1"
-      source  = "github.com/hashicorp/qemu"
-    }
   }
 }
 
 variable "artifact_description" {
   type    = string
-  default = "Rocky 10.0"
+  default = "Rocky 9.4"
 }
 
 variable "artifact_version" {
   type    = string
-  default = "10.0"
+  default = "9.4"
 }
 
 variable "disk_size" {
   type    = string
-  default = "61440"
+  default = "40960"
 }
 
 variable "iso_checksum" {
   type    = string
-  default = "de75c2f7cc566ea964017a1e94883913f066c4ebeb1d356964e398ed76cadd12"
+  default = "06505828e8d5d052b477af5ce62e50b938021f5c28142a327d4d5c075f0670dc"
 }
 
 variable "iso_checksum_type" {
@@ -42,8 +34,7 @@ variable "iso_checksum_type" {
 
 variable "iso_url" {
   type    = string
-  # default = "https://download.rockylinux.org/pub/rocky/10/isos/x86_64/Rocky-10.0-x86_64-minimal.iso"
-  default = "Rocky-10.0-x86_64-minimal.iso"
+  default = "Rocky-9.4-x86_64-minimal.iso"
 }
 
 variable "redhat_platform" {
@@ -53,7 +44,7 @@ variable "redhat_platform" {
 
 variable "redhat_release" {
   type    = string
-  default = "10"
+  default = "9"
 }
 
 variable "ssh_password" {
@@ -66,67 +57,14 @@ variable "ssh_username" {
   default = "vagrant"
 }
 
-variable "http_directory" {
-  type    = string
-  default = "http"
-}
-
-source "qemu" "rockylinux" {
-  boot_command           = [
-    "<up>",
-    "e",
-    "<down><down><end><wait>",
-    " inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/rocky10-ks.cfg ",
-    " biosdevname=0 net.ifnames=0 ",
-    "<enter><wait><leftCtrlOn>x<leftCtrlOff>"
+source "virtualbox-iso" "virtualbox" {
+  boot_command            = [
+    "<esc>",
+    "<wait><esc><esc>",
+    "linux inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/ks.cfg biosdevname=0 net.ifnames=0",
+    "<enter>"
   ]
-  boot_wait               = "10s"
-  disk_size               = "${var.disk_size}"
-  http_directory          = "${path.root}/${var.http_directory}"
-  iso_checksum            = "${var.iso_checksum_type}:${var.iso_checksum}"
-  iso_url                 = "${var.iso_url}"
-  output_directory        = "output-rockylinux${var.redhat_release}-qemu"
-  format                  = "qcow2"
-  ssh_password            = "${var.ssh_password}"
-  ssh_username            = "${var.ssh_username}"
-  ssh_timeout             = "60m"
-  vm_name                 = "rockylinux${var.redhat_release}-qemu"
-  net_device              = "virtio-net"
-  disk_interface          = "virtio"
-  # headless                = true
-
-  # Настройки QEMU
-  # Параметры процессора
-  cpus                   = 2
-  memory                 = 2048
-  accelerator            = "kvm"
-  cpu_model              = "host"           # Использовать характеристики хоста
-  machine_type           = "q35"            # Тип системной платы
-  firmware               = "/usr/share/edk2-ovmf/OVMF_CODE.fd" # UEFI вместо BIOS. Проверьте местоположение
-
-  # Настройки видео
-  vga              = "virtio" # Для virtio-vga
-
-  ## Дополнительные флаги процессора
-  qemuargs = [
-    ["-device", "qemu-xhci"], # Виртуализированные USB-контроллеры
-    ["-device", "virtio-tablet"], # Устройства ввода
-    ## GPU-passthrough
-    # ["-device", "virtio-gpu-pci"], #  3D-акселерация через VirGL
-    # ["-vga", "none"]
-  ]
-}
-
-source "virtualbox-iso" "rockylinux" {
-  boot_command = [
-    "<up>",
-    "e",
-    "<down><down><end><wait>",
-    " inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/rocky10-ks.cfg ",
-    " biosdevname=0 net.ifnames=0 ",
-    "<enter><wait><leftCtrlOn>x<leftCtrlOff>"
-  ]
-  boot_wait               = "10s"
+  boot_wait               = "30s"
   disk_size               = "${var.disk_size}"
   export_opts             = [
     "--manifest",
@@ -136,10 +74,11 @@ source "virtualbox-iso" "rockylinux" {
   ]
   guest_additions_path    = "VBoxGuestAdditions.iso"
   guest_os_type           = "RedHat_64"
-  http_directory          = "${var.http_directory}"
+  hard_drive_interface    = "sata"
+  http_directory          = "${path.root}/http"
   iso_checksum            = "${var.iso_checksum_type}:${var.iso_checksum}"
   iso_url                 = "${var.iso_url}"
-  output_directory        = "output-rockylinux${var.redhat_release}-virtualbox"
+  output_directory        = "builds"
   shutdown_command        = "sudo -S /sbin/halt -h -p"
   shutdown_timeout        = "5m"
   ssh_password            = "${var.ssh_password}"
@@ -147,42 +86,46 @@ source "virtualbox-iso" "rockylinux" {
   ssh_port                = 22
   ssh_pty                 = true
   ssh_timeout             = "60m"
-  iso_interface           = "sata"
-  headless                = true
   vboxmanage              = [
-    [ "modifyvm", "{{.Name}}", "--memory", "2048" ],
-    [ "modifyvm", "{{.Name}}", "--cpus", "2" ],
-    [ "modifyvm", "{{.Name}}", "--nat-localhostreachable1", "on" ],
-    [ "modifyvm", "{{.Name}}", "--firmware", "EFI" ],
-    ["modifyvm", "{{.Name}}", "--vrde", "on"],
-    ["modifyvm", "{{.Name}}", "--vrdeport", "3390"]
-  ]
+    ["modifyvm", "{{.Name}}", "--memory", "2048"],
+    ["modifyvm", "{{.Name}}", "--cpus", "2"],
+    ["modifyvm", "{{.Name}}", "--nat-localhostreachable1", "on"]
+  ] 
   virtualbox_version_file = ".vbox_version"
-  vm_name                 = "rockylinux${var.redhat_release}-virtualbox"
+  vm_name                 = "packer-rocky-virtualbox-vm"
 }
 
 build {
-  sources = [
-    "source.virtualbox-iso.rockylinux",
-    "source.qemu.rockylinux"
-  ]
+  sources = ["source.virtualbox-iso.virtualbox"]
 
   provisioner "shell" {
     execute_command = "echo 'packer'|{{ .Vars }} sudo -S -E bash '{{ .Path }}'"
-    scripts         = ["scripts/vagrant.sh", "scripts/software.sh"]
-  }
-
-  provisioner "shell" {
-    only           = ["virtualbox-iso.rockylinux"]
-    script         = "scripts/virtualbox.sh"
-  }
-
-  provisioner "shell" {
-    script         = "scripts/cleanup.sh"
+    inline          = [
+      "sleep 30",
+      "sudo dnf -y install epel-release",
+      "sudo dnf -y groupinstall 'Development Tools'",
+      "sudo dnf -y install kernel-devel",
+      "sudo dnf -y install dkms",
+      "sudo mkdir /tmp/vboxguest",
+      "sudo mount -t iso9660 -o loop /home/vagrant/VBoxGuestAdditions.iso /tmp/vboxguest",
+      "cd /tmp/vboxguest",
+      "sudo ./VBoxLinuxAdditions.run",
+      "cd /tmp",
+      "sudo umount /tmp/vboxguest",
+      "sudo rmdir /tmp/vboxguest",
+      "rm /home/vagrant/VBoxGuestAdditions.iso",
+      "sudo systemctl enable --now vboxadd.service",
+      "sudo dnf -y install lightdm",
+      "sudo dnf -y groupinstall 'Server with GUI'",
+      "sudo dnf install -y mc htop tmux",
+      "sudo systemctl set-default graphical.target",
+      "echo Image Provisioned!"
+    ]
   }
 
   post-processor "vagrant" {
     compression_level = "6"
-    output            = "vagrant-{{ .Provider }}-rockylinux${var.redhat_release}-${var.redhat_platform}.box"
+    output            = "vagrant-virtualbox-rocky-${var.redhat_release}-${var.redhat_platform}.box"
   }
 }
+

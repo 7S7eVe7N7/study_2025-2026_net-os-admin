@@ -2,8 +2,8 @@
 
 echo "Provisioning script $0"
 
-username=iemashkov
-userpassword=2005
+username=user
+userpassword=1234
 
 encpassword=`openssl passwd -1 ${userpassword}`
 

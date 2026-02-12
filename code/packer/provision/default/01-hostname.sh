@@ -1,6 +1,6 @@
 #!/bin/bash
 
-username=iemashkov
+username=user
 
 hostnamectl set-hostname "${HOSTNAME%%.*}".${username}.net   
 
