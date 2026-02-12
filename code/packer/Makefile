@@ -1,28 +1,48 @@
-# Цели по умолчанию
-.DEFAULT_GOAL := help
+# ----------------------------------------
+# Измените пути здесь на ваши
+# ----------------------------------------
+PACKER := "C:\Dz\work\iemashkov\packer\packer.exe"   
+VBOXMANAGE := "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"  # Adjust if needed
 
-.PHONY: version
+# Packer plugin configuration
+PACKER_CONFIG_DIR := "$(CURDIR)/.config/packer"
+PACKER_PLUGIN_DIR := "$(PACKER_CONFIG_DIR)/plugins"
 
-# Получение текущего каталога
-CURDIR := $(realpath .)
+.PHONY: all init box help
 
-init: ## Install missing plugins for packer
-	@mkdir -p "$(CURDIR)""/.config/packer/plugins"
-	@export PACKER_CONFIG_DIR="$(CURDIR)""/.config/packer"; export PACKER_PLUGIN_PATH="$(CURDIR)""/.config/packer/plugins"; packer init vagrant-rocky.pkr.hcl
+# ----------------------------------------
+# Default target
+# ----------------------------------------
+all: init box
 
-virtualbox:	init    ## Build Rocky Linux box for Virtualbox
-	-@VBoxManage setproperty language C
-	-@VBoxManage setproperty machinefolder "$(CURDIR)"/vm
-	-@export TMPDIR="$(CURDIR)"; export PACKER_CONFIG_DIR="$(CURDIR)""/.config/packer"; export PACKER_PLUGIN_PATH="$(CURDIR)""/.config/packer/plugins"; packer build -only=virtualbox-iso.rockylinux vagrant-rocky.pkr.hcl
-	-@VBoxManage setproperty machinefolder default
+# ----------------------------------------
+# Initialize Packer (downloads required plugins)
+# ----------------------------------------
+init: ## Initialize Packer and download required plugins
+  @mkdir -p $(PACKER_PLUGIN_DIR)
+  @export PACKER_PLUGIN_PATH=$(PACKER_PLUGIN_DIR); \
+  "$(PACKER)" init -upgrade vagrant-rocky.pkr.hcl
 
-qemu:	init    ## Build Rocky Linux box for Qemu
-	-@export TMPDIR="$(CURDIR)"; export PACKER_CONFIG_DIR="$(CURDIR)""/.config/packer"; export PACKER_PLUGIN_PATH="$(CURDIR)""/.config/packer/plugins"; packer build -only=qemu.rockylinux vagrant-rocky.pkr.hcl
+# ----------------------------------------
+# Build the box
+# ----------------------------------------
+box: init ## Build box for Rocky Linux using VirtualBox
+  @$(VBOXMANAGE) setproperty language C
+  @$(VBOXMANAGE) setproperty machinefolder "pwd/vm"
+  @export TMPDIR="pwd"; \
+  export PACKER_CONFIG_DIR=$(PACKER_CONFIG_DIR); \
+  export PACKER_PLUGIN_PATH=$(PACKER_PLUGIN_DIR); \
+  "$(PACKER)" build -only=virtualbox-iso.virtualbox vagrant-rocky.pkr.hcl
+  @$(VBOXMANAGE) setproperty machinefolder default
 
+# ----------------------------------------
+# Help
+# ----------------------------------------
 help:
-	@echo 'Usage:'
-	@echo '  make <target>'
-	@echo
-	@echo 'Targets:'
-	@grep -E '^[a-zA-Z_0-9.-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
-	@echo
+  @echo 'Usage:'
+  @echo '  make <target>'
+  @echo
+  @echo 'Targets:'
+  @grep -E '^[a-zA-Z_0-9.-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+    | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+  @echo
